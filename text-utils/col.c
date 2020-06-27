@@ -167,21 +167,21 @@ static inline void col_putchar(wchar_t ch)
  */
 static void flush_blanks(struct col_ctl *ctl)
 {
-	int half = 0, i, nb = ctl->nblank_lines;
+	int half = 0, i;
 
-	if (nb & 1) {
+	if (ctl->nblank_lines & 1) {
 		if (ctl->fine)
 			half = 1;
 		else
-			nb++;
+			ctl->nblank_lines++;
 	}
-	nb /= 2;
-	for (i = nb; --i >= 0;)
+	ctl->nblank_lines /= 2;
+	for (i = ctl->nblank_lines; --i >= 0;)
 		col_putchar(NL);
 	if (half) {
 		col_putchar(ESC);
 		col_putchar('9');
-		if (!nb)
+		if (!ctl->nblank_lines)
 			col_putchar(CR);
 	}
 	ctl->nblank_lines = 0;
