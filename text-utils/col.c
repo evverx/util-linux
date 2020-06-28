@@ -292,6 +292,9 @@ static void flush_line(struct col_ctl *ctl, LINE *l)
 					break;
 				case CS_ALTERNATE:
 					col_putchar(SO);
+					break;
+				default:
+					abort();
 				}
 				ctl->last_set = c->c_set;
 			}
@@ -380,6 +383,9 @@ static int handle_not_graphic(struct col_ctl *ctl, struct col_lines *lns)
 			lns->cur_line += 1;
 			if (0 < lns->cur_line && lns->max_line < (size_t)lns->cur_line)
 				lns->max_line = lns->cur_line;
+			break;
+		default:
+			break;
 		}
 		return 1;
 	case NL:
@@ -404,6 +410,8 @@ static int handle_not_graphic(struct col_ctl *ctl, struct col_lines *lns)
 	case VT:
 		lns->cur_line -= 2;
 		return 1;
+	default:
+		break;
 	}
 	if (iswspace(lns->ch)) {
 		if (0 < wcwidth(lns->ch))
