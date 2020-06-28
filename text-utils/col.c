@@ -192,9 +192,11 @@ static void flush_blanks(struct col_ctl *ctl)
 		else
 			ctl->nblank_lines++;
 	}
+
 	ctl->nblank_lines /= 2;
 	for (i = ctl->nblank_lines; 0 < i; i--)
 		col_putchar(NL);
+
 	if (half) {
 		col_putchar(ESC);
 		col_putchar('9');
@@ -222,11 +224,11 @@ static void flush_line(struct col_ctl *ctl, LINE *l)
 		 * Do an O(n) sort on l->l_line by column being careful to
 		 * preserve the order of characters in the same column.
 		 */
-		if (l->l_lsize > sorted_size) {
+		if (sorted_size < l->l_lsize) {
 			sorted_size = l->l_lsize;
 			sorted = xrealloc(sorted, sizeof(CHAR) * sorted_size);
 		}
-		if (l->l_max_col >= count_size) {
+		if (count_size <= l->l_max_col) {
 			count_size = l->l_max_col + 1;
 			count = xrealloc((void *)count, sizeof(size_t) * count_size);
 		}
@@ -249,35 +251,35 @@ static void flush_line(struct col_ctl *ctl, LINE *l)
 		c = sorted;
 	} else
 		c = l->l_line;
-	while (nchars > 0) {
+
+	while (0 < nchars) {
 		this_col = c->c_column;
 		endc = c;
 		do {
 			++endc;
-		} while (--nchars > 0 && this_col == endc->c_column);
+		} while (0 < --nchars && this_col == endc->c_column);
 
 		/* if -b only print last character */
 		if (ctl->no_backspaces) {
 			c = endc - 1;
-			if (nchars > 0 &&
-			    this_col + c->c_width > endc->c_column)
+			if (0 < nchars && endc->c_column < this_col + c->c_width)
 				continue;
 		}
 
-		if (this_col > last_col) {
+		if (last_col < this_col) {
 			ssize_t nspace = this_col - last_col;
 
-			if (ctl->compress_spaces && nspace > 1) {
+			if (ctl->compress_spaces && 1 < nspace) {
 				ssize_t ntabs;
 
 				ntabs = this_col / 8 - last_col / 8;
-				if (ntabs > 0) {
+				if (0 < ntabs) {
 					nspace = this_col & 7;
-					while (--ntabs >= 0)
+					while (0 <= --ntabs)
 						col_putchar(TAB);
 				}
 			}
-			while (--nspace >= 0)
+			while (0 <= --nspace)
 				col_putchar(SPACE);
 			last_col = this_col;
 		}
@@ -294,12 +296,14 @@ static void flush_line(struct col_ctl *ctl, LINE *l)
 				ctl->last_set = c->c_set;
 			}
 			col_putchar(c->c_char);
-			if ((c + 1) < endc) {
+			if (c + 1 < endc) {
 				int i;
-				for (i=0; i < c->c_width; i++)
+
+				for (i = 0; i < c->c_width; i++)
 					col_putchar(BS);
 			}
-			if (++c >= endc)
+
+			if (endc <= ++c)
 				break;
 		}
 		last_col += (c - 1)->c_width;
@@ -335,7 +339,7 @@ static void flush_lines(struct col_ctl *ctl, ssize_t nflush)
 {
 	LINE *l;
 
-	while (--nflush >= 0) {
+	while (0 <= --nflush) {
 		l = ctl->lines;
 		ctl->lines = l->l_next;
 		if (l->l_line) {
@@ -402,7 +406,7 @@ static int handle_not_graphic(struct col_ctl *ctl, struct col_lines *lns)
 		return 1;
 	}
 	if (iswspace(lns->ch)) {
-		if (wcwidth(lns->ch) > 0)
+		if (0 < wcwidth(lns->ch))
 			lns->cur_col += wcwidth(lns->ch);
 		return 1;
 	}
@@ -414,7 +418,6 @@ static int handle_not_graphic(struct col_ctl *ctl, struct col_lines *lns)
 
 static void update_cur_line(struct col_ctl *ctl, struct col_lines *lns)
 {
-	LINE *lnew;
 	ssize_t nmove;
 
 	lns->adjust = 0;
@@ -429,6 +432,7 @@ static void update_cur_line(struct col_ctl *ctl, struct col_lines *lns)
 	if (nmove < 0) {
 		for (; nmove < 0 && ctl->l->l_prev; nmove++)
 			ctl->l = ctl->l->l_prev;
+
 		if (nmove) {
 			if (lns->nflushd_lines == 0) {
 				/*
@@ -436,7 +440,7 @@ static void update_cur_line(struct col_ctl *ctl, struct col_lines *lns)
 				 * has been flushed yet.
 				 */
 				for (; nmove < 0; nmove++) {
-					lnew = alloc_line(ctl);
+					LINE *lnew = alloc_line(ctl);
 					ctl->l->l_prev = lnew;
 					lnew->l_next = ctl->l;
 					ctl->l = ctl->lines = lnew;
@@ -455,18 +459,20 @@ static void update_cur_line(struct col_ctl *ctl, struct col_lines *lns)
 		}
 	} else {
 		/* may need to allocate here */
-		for (; nmove > 0 && ctl->l->l_next; nmove--)
+		for (; 0 < nmove && ctl->l->l_next; nmove--)
 			ctl->l = ctl->l->l_next;
-		for (; nmove > 0; nmove--) {
-			lnew = alloc_line(ctl);
+
+		for (; 0 < nmove; nmove--) {
+			LINE *lnew = alloc_line(ctl);
 			lnew->l_prev = ctl->l;
 			ctl->l->l_next = lnew;
 			ctl->l = lnew;
 		}
 	}
+
 	lns->this_line = lns->cur_line + lns->adjust;
 	nmove = lns->this_line - lns->nflushd_lines;
-	if (nmove > 0 && (size_t)nmove >= ctl->max_bufd_lines + BUFFER_MARGIN) {
+	if (0 < nmove && ctl->max_bufd_lines + BUFFER_MARGIN <= (size_t)nmove) {
 		lns->nflushd_lines += nmove - ctl->max_bufd_lines;
 		flush_lines(ctl, nmove - ctl->max_bufd_lines);
 	}
@@ -573,7 +579,7 @@ int main(int argc, char **argv)
 			update_cur_line(&ctl, &lns);
 
 		/* grow line's buffer? */
-		if (ctl.l->l_line_len + 1 >= ctl.l->l_lsize) {
+		if (ctl.l->l_lsize <= ctl.l->l_line_len + 1) {
 			size_t need;
 
 			need = ctl.l->l_lsize ? ctl.l->l_lsize * 2 : NALLOC;
@@ -596,7 +602,7 @@ int main(int argc, char **argv)
 			ctl.l->l_needs_sort = 1;
 		else
 			ctl.l->l_max_col = lns.cur_col;
-		if (lns.c->c_width > 0)
+		if (0 < lns.c->c_width)
 			lns.cur_col += lns.c->c_width;
 	}
 	/* goto the last line that had a character on it */
