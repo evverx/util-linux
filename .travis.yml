@@ -46,14 +46,6 @@ jobs:
         # Generated with `travis encrypt -r karelzak/util-linux COVERITY_SCAN_TOKEN=***`
         - secure: cqwhidkCY+BckuBwmBevstLCHJm9aS2pQnYB3xGiz9JeqwW/x5h9pMElQdTFWw3AD2p5DzKzuW9nUtqNVzMSUWdPBrQGeuBT5tJW5eFeP/9mb5CG1/+w5xzOaZ/+3CK0gtcMSyRhGl2NeuLlimj6hzy37cUTSmBVHzGMZLD51As=
 
-branches:
-  only:
-    - master
-    - next
-    - /^stable.*/
-    - /^topic.*/
-    - /^travis.*/
-
 before_install:
   # print some host info
   - env | grep -v "encrypted" | LC_ALL=C sort
